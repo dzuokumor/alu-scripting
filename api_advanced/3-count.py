@@ -1,60 +1,43 @@
 #!/usr/bin/python3
-"""Doc"""
+'''a recursive function that queries the Reddit API,
+ parses the title of all hot articles, and prints a
+ sorted count of given keywords
+'''
 import requests
 
-
-def count_words(subreddit, word_list, after="", words_count={}):
-    """"Doc"""
-    url = "https://www.reddit.com/r/{}/hot.json?limit=100" \
-        .format(subreddit)
-    header = {'User-Agent': 'Mozilla/5.0'}
-    param = {'after': after}
-    res = requests.get(url, headers=header, params=param)
-
-    if res.status_code != 200:
+def count_words(subreddit, word_list, fullname="", count=0, hash_table={}):
+    '''fetches all hot posts in a subreddit
+    Return:
+        None - if subreddit is invalid
+    '''
+    if subreddit is None or not isinstance(subreddit, str) or \
+       word_list is None or word_list == []:
         return
-
-    json_res = res.json()  # chch
-    after = json_res.get('data').get('after')
-    has_next = after is not None
-    hot_titles = []
-    words = [word.lower() for word in word_list]
-
-    if len(words_count) == 0:
-        words_count = {word: 0 for word in words}
-    # print(words_count)
-    hot_articles = json_res.get('data').get('children')
-    [hot_titles.append(article.get('data').get('title'))
-     for article in hot_articles]
-
-    # loop through all titles
-    for i in range(len(hot_titles)):
-        # make the title as a list of word
-        # title_words = hot_titles[i].lower().split()
-        for title_word in hot_titles[i].lower().split():
-            for word in words:
-                if word.lower() == title_word:
-                    words_count[word] = words_count.get(word) + 1
-                # else:
-                #     # pass
-                #     print(word.lower() + " != " + title_word)
-
-    if has_next:
-        # print(after + "\t" + str(has_next))
-        return count_words(subreddit, word_list, after, words_count)
+    url = 'https://www.reddit.com/r/{}/hot/.json'.format(subreddit)
+    params = {'after': fullname, 'limit': 100, 'count': count}
+    headers = {'user-agent': 'Mozilla/5.0 \
+(Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0'}
+    info = requests.get(url, headers=headers,
+                        params=params, allow_redirects=False)
+    if info.status_code != 200:
+        return None
+    info_json = info.json()
+    results = info_json.get('data').get('children')
+    new_packet = [post.get('data').get('title') for post in results]
+    for title in new_packet:
+        for word in word_list:
+            word = word.lower()
+            formatted_title = title.lower().split(" ")
+            if word in formatted_title:
+                if (word in hash_table.keys()):
+                    hash_table[word] += formatted_title.count(word)
+                else:
+                    hash_table[word] = formatted_title.count(word)
+    after = info_json.get('data').get('after', None)
+    dist = info_json.get('data').get('dist')
+    count += dist
+    if after:
+        count_words(subreddit, word_list, after, count, hash_table)
     else:
-
-        words_count = dict(filter(lambda item: item[1] != 0,
-                                  words_count.items()))
-        # their python version is not making people’s life easier
-        # words_count = {key: value for key, value in
-        #                sorted(words_count.items(),
-        #                       key=lambda item: item[1], reverse=True)}
-
-        words_count = sorted(words_count.items(),
-                             key=lambda item: item[1],
-                             reverse=True)
-
-        for i in range(len(words_count)):
-            print("{}: {}".format(words_count[i][0],
-                                  words_count[i][1]))
+        {print('{}: {}'.format(key, value)) for
+         key, value in sorted(hash_table.items(), key=lambda i: (-i[1], i[0]))}
